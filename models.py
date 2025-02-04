@@ -3,45 +3,28 @@ from sqlalchemy import create_engine, Column, Integer, String, Text, ForeignKey
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 from sqlalchemy.dialects.postgresql import UUID
 import os
-from pydantic import BaseModel, Field
-from typing import Optional
 
-DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://postgres:kuhu2004@localhost:5432/clinic360") # Replace with your credentials
+DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://user:password@localhost:5432/clinic360") # Replace with your credentials
 
 engine = create_engine(DATABASE_URL)
 Base = declarative_base()
 
-class PatientCreate(BaseModel):  # For creating patients
-    name: str = Field(..., min_length=1, max_length=255)
-    age: int = Field(..., ge=0)
-    gender: str = Field(..., min_length=1, max_length=10)
-    contact: str = Field(..., min_length=1)
-    medical_history: str = Field(...)
+class Patient(Base):
+    __tablename__ = "patients"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String, nullable=False)
+    age = Column(Integer)
+    gender = Column(String)
+    contact = Column(String)
+    medical_history = Column(Text) #Simplified for now
 
-class PatientBase(BaseModel): #Common fields
-    name: str
-    age: Optional[int] = None
-    gender: Optional[str] = None
-    contact: Optional[str] = None
-    medical_history: Optional[str] = None
+    records = relationship("MedicalRecord", backref="patient")
 
-class Patient(PatientBase): #Adding the UUID
-    id: uuid.UUID
-    class Config:
-         orm_mode = True #this is important to use SQLAlchemy models
-
-
-class MedicalRecordCreate(BaseModel):
-    patient_id: uuid.UUID = Field(...)
-    record_details: str = Field(..., min_length=1)
-
-class MedicalRecord(BaseModel):
-    id: uuid.UUID
-    patient_id: uuid.UUID
-    record_details: str
-
-    class Config:
-        orm_mode = True
+class MedicalRecord(Base):
+    __tablename__ = "medical_records"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    patient_id = Column(UUID(as_uuid=True), ForeignKey("patients.id"), nullable=False)
+    record_details = Column(Text, nullable=False) #Keep simple for now
 
 
 Base.metadata.create_all(engine)
