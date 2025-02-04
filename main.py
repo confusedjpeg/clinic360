@@ -3,7 +3,7 @@ import uuid
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from models import User, Patient, MedicalRecord, Appointment, Doctor, SessionLocal
+from .models import User, Patient, MedicalRecord, Appointment, Doctor, SessionLocal
 import jwt
 import os
 from datetime import datetime, timedelta
@@ -11,6 +11,11 @@ from pydantic import BaseModel, Field #for input validation
 from typing import Optional
 import bcrypt  
 from datetime import datetime
+from celery import Celery
+from celery.schedules import crontab
+from celery.result import AsyncResult
+from celery import shared_task
+from .celery import send_email, appointment 
 
 
 SECRET_KEY = os.environ.get("SECRET_KEY", "default_key_for_development_only") #Set your own SECRET_KEY in .env file or os environment variable
@@ -217,6 +222,12 @@ async def book_appointment(appointment_data: AppointmentCreate, db: Session = De
         db.add(new_appointment)
         db.commit() #Commit transaction only if successful
         db.refresh(new_appointment)
+        email_data = {
+            "recipient": current_user.email, #You'll need to add email field to your User model.
+            "subject": "Appointment Confirmation",
+            "body": f"Your appointment with Dr. {doctor.name} is scheduled for {appointment.appointment_time}",
+        }
+        send_email.delay(email_data)
     except Exception as e:
         db.rollback() #Rollback transaction if error occurs
         print(f"Error booking appointment: {e}") #Log the error
@@ -247,3 +258,20 @@ async def cancel_appointment(appointment_id: uuid.UUID, db: Session = Depends(ge
   appointment.booked = False #Instead of deleting, we set the booked status to False
   db.commit()
   return {"message": "Appointment cancelled successfully"}
+
+@app.post("/send-test-email/")
+async def send_test_email():
+    email_data = {
+        "recipient": "your_test_email@example.com",  # Replace with your test email address
+        "subject": "Test Email from Celery",
+        "body": "This is a test email sent using Celery and yagmail.",
+    }
+    task = send_email.delay(email_data)
+    return {"task_id": task.id}
+
+
+
+@app.get("/tasks/{task_id}/")
+async def check_task_status(task_id: str):
+  task = AsyncResult(task_id)
+  return {"status": task.status, "result":task.result}
