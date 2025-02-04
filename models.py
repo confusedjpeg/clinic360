@@ -11,22 +11,37 @@ DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://postgres:kuhu2004@lo
 engine = create_engine(DATABASE_URL)
 Base = declarative_base()
 
-class Patient(Base):
-    __tablename__ = "patients"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name = Column(String, nullable=False)
-    age = Column(Integer)
-    gender = Column(String)
-    contact = Column(String)
-    medical_history = Column(Text) #Simplified for now
+class PatientCreate(BaseModel):  # For creating patients
+    name: str = Field(..., min_length=1, max_length=255)
+    age: int = Field(..., ge=0)
+    gender: str = Field(..., min_length=1, max_length=10)
+    contact: str = Field(..., min_length=1)
+    medical_history: str = Field(...)
 
-    records = relationship("MedicalRecord", backref="patient")
+class PatientBase(BaseModel): #Common fields
+    name: str
+    age: Optional[int] = None
+    gender: Optional[str] = None
+    contact: Optional[str] = None
+    medical_history: Optional[str] = None
 
-class MedicalRecord(Base):
-    __tablename__ = "medical_records"
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    patient_id = Column(UUID(as_uuid=True), ForeignKey("patients.id"), nullable=False)
-    record_details = Column(Text, nullable=False) #Keep simple for now
+class Patient(PatientBase): #Adding the UUID
+    id: uuid.UUID
+    class Config:
+         orm_mode = True #this is important to use SQLAlchemy models
+
+
+class MedicalRecordCreate(BaseModel):
+    patient_id: uuid.UUID = Field(...)
+    record_details: str = Field(..., min_length=1)
+
+class MedicalRecord(BaseModel):
+    id: uuid.UUID
+    patient_id: uuid.UUID
+    record_details: str
+
+    class Config:
+        orm_mode = True
 
 
 Base.metadata.create_all(engine)

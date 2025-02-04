@@ -8,6 +8,7 @@ import jwt
 import os
 from datetime import datetime, timedelta
 from pydantic import BaseModel, Field #for input validation
+from typing import Optional
 
 
 SECRET_KEY = os.environ.get("SECRET_KEY", "your_secret_key") #Set your own SECRET_KEY in .env file or os environment variable
@@ -43,16 +44,37 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
 
 #Pydantic Models for input validation
 
-class PatientCreate(BaseModel):
-   name: str = Field(..., min_length=1, max_length=255)
-   age: int = Field(..., ge=0)
-   gender: str = Field(..., min_length=1, max_length=10)
-   contact: str = Field(..., min_length=1)
-   medical_history: str = Field(...)
+class PatientCreate(BaseModel):  # For creating patients
+    name: str = Field(..., min_length=1, max_length=255)
+    age: int = Field(..., ge=0)
+    gender: str = Field(..., min_length=1, max_length=10)
+    contact: str = Field(..., min_length=1)
+    medical_history: str = Field(...)
 
-class RecordCreate(BaseModel):
-    patient_id: uuid.UUID = Field(...) #Requires the UUID of existing patient
+class PatientBase(BaseModel): #Common fields
+    name: str
+    age: Optional[int] = None
+    gender: Optional[str] = None
+    contact: Optional[str] = None
+    medical_history: Optional[str] = None
+
+class Patient(PatientBase): #Adding the UUID
+    id: uuid.UUID
+    class Config:
+         orm_mode = True #this is important to use SQLAlchemy models
+
+
+class MedicalRecordCreate(BaseModel):
+    patient_id: uuid.UUID = Field(...)
     record_details: str = Field(..., min_length=1)
+
+class MedicalRecord(BaseModel):
+    id: uuid.UUID
+    patient_id: uuid.UUID
+    record_details: str
+
+    class Config:
+        orm_mode = True
 
 
 
@@ -65,7 +87,7 @@ def register_patient(patient: PatientCreate, db: Session = Depends(get_db)):
     return new_patient
 
 @app.post("/create-record/", response_model=MedicalRecord)
-def create_record(record: RecordCreate, db: Session = Depends(get_db)):
+def create_record(record: MedicalRecordCreate, db: Session = Depends(get_db)):
     existing_patient = db.query(Patient).filter(Patient.id == record.patient_id).first()
     if not existing_patient:
         raise HTTPException(status_code=404, detail="Patient not found")
