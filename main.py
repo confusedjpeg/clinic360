@@ -1,14 +1,16 @@
 import uvicorn
 import uuid
 from fastapi import FastAPI, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from models import Patient, MedicalRecord, SessionLocal 
+from models import User, Patient, MedicalRecord, SessionLocal
 import jwt
 import os
 from datetime import datetime, timedelta
 from pydantic import BaseModel, Field #for input validation
 from typing import Optional
+import bcrypt  # Install with: pip install bcrypt
+
 
 
 SECRET_KEY = os.environ.get("SECRET_KEY", "default_key_for_development_only") #Set your own SECRET_KEY in .env file or os environment variable
@@ -23,8 +25,7 @@ def get_db():
     finally:
         db.close()
 
-#JWT Functions -  Very Basic for now (Replace with more robust implementation in a real-world app)
-
+#JWT Functions -  Very Basic for now (Replace with more robust implementation in a real-world app)        
 def create_access_token(data: dict):
     to_encode = data.copy()
     expire = datetime.utcnow() + timedelta(minutes=60)
@@ -79,9 +80,49 @@ class MedicalRecord(BaseModel):
 class RecordUpdate(BaseModel):
     record_details: str | None = Field(default=None, min_length=1) 
 
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+#User Credentials Model for input validation
+class UserCredentials(BaseModel):
+    username: str = Field(..., min_length=3, max_length=255)
+    password: str = Field(..., min_length=8)
+
+
+@app.post("/token") #Enhanced Token endpoint
+def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.username == form_data.username).first()
+    if not user or not user.check_password(form_data.password):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect username or password")
+    token = create_access_token({"user_id": str(user.id)}) # Use str(user.id)
+    return {"access_token": token, "token_type": "bearer"}
+
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        user_id = payload.get("user_id")
+        user = db.query(User).filter(User.id == uuid.UUID(user_id)).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        return user
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error: {e}")
+    
+@app.post("/register/", response_model=User)
+def register_user(user: UserCredentials, db: Session = Depends(get_db)):
+    hashed_password = bcrypt.hashpw(user.password.encode('utf-8'), bcrypt.gensalt())
+    new_user = User(username=user.username, password_hash=hashed_password.decode('utf-8'))
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return new_user
+
 
 @app.post("/register-patient/", response_model=Patient)
-def register_patient(patient: PatientCreate, db: Session = Depends(get_db)):
+def register_patient(patient: PatientCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     new_patient = Patient(**patient.dict())
     db.add(new_patient)
     db.commit()
@@ -89,7 +130,7 @@ def register_patient(patient: PatientCreate, db: Session = Depends(get_db)):
     return new_patient
 
 @app.post("/create-record/", response_model=MedicalRecord)
-def create_record(record: MedicalRecordCreate, db: Session = Depends(get_db)):
+def create_record(record: MedicalRecordCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     existing_patient = db.query(Patient).filter(Patient.id == record.patient_id).first()
     if not existing_patient:
         raise HTTPException(status_code=404, detail="Patient not found")
@@ -100,12 +141,12 @@ def create_record(record: MedicalRecordCreate, db: Session = Depends(get_db)):
     return new_record
 
 @app.get("/view-records/{patient_id}/", response_model=list[MedicalRecord])
-def view_records(patient_id: uuid.UUID, db: Session = Depends(get_db)):
+def view_records(patient_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     records = db.query(MedicalRecord).filter(MedicalRecord.patient_id == patient_id).all()
     return records
 
 @app.put("/update-record/{record_id}/", response_model=MedicalRecord)
-def update_record(record_id: uuid.UUID, record_update: RecordUpdate, db: Session = Depends(get_db)):
+def update_record(record_id: uuid.UUID, record_update: RecordUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     record = db.query(MedicalRecord).filter(MedicalRecord.id == record_id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Record not found")
@@ -128,9 +169,3 @@ def delete_record(record_id: uuid.UUID, db: Session = Depends(get_db)):
     return None # 204 No Content
 
 
-@app.post("/token") #Simple Token endpoint
-def login(db: Session = Depends(get_db)):
-    #In real application, you would validate user credentials here.
-    #For this example, we just return a token
-    token = create_access_token({"user_id": "testuser"}) #Replace with actual user ID later
-    return {"access_token": token, "token_type": "bearer"}
