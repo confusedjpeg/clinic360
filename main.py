@@ -45,6 +45,14 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
 
 #Pydantic Models for input validation
 
+class UserPydantic(BaseModel):
+    id: uuid.UUID
+    username: str
+    #password_hash: str #Don't include password hash in response
+
+    class Config:
+        orm_mode = True  # Enable mapping from SQLAlchemy models
+
 class PatientCreate(BaseModel):  # For creating patients
     name: str = Field(..., min_length=1, max_length=255)
     age: int = Field(..., ge=0)
@@ -111,7 +119,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error: {e}")
     
-@app.post("/register/", response_model=User)
+@app.post("/register/", response_model=UserPydantic)
 def register_user(user: UserCredentials, db: Session = Depends(get_db)):
     hashed_password = bcrypt.hashpw(user.password.encode('utf-8'), bcrypt.gensalt())
     new_user = User(username=user.username, password_hash=hashed_password.decode('utf-8'))
@@ -123,22 +131,32 @@ def register_user(user: UserCredentials, db: Session = Depends(get_db)):
 
 @app.post("/register-patient/", response_model=Patient)
 def register_patient(patient: PatientCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    new_patient = Patient(**patient.dict())
-    db.add(new_patient)
-    db.commit()
-    db.refresh(new_patient)
-    return new_patient
+    try:
+        new_patient = Patient(**patient.dict())
+        db.add(new_patient)
+        db.commit()
+        db.refresh(new_patient)
+        return new_patient
+    except Exception as e:
+        print(f"Error registering patient: {e}") #Log the error
+        raise HTTPException(status_code=500, detail="Internal Server Error")
 
 @app.post("/create-record/", response_model=MedicalRecord)
 def create_record(record: MedicalRecordCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    existing_patient = db.query(Patient).filter(Patient.id == record.patient_id).first()
-    if not existing_patient:
-        raise HTTPException(status_code=404, detail="Patient not found")
-    new_record = MedicalRecord(patient_id=record.patient_id, record_details=record.record_details)
-    db.add(new_record)
-    db.commit()
-    db.refresh(new_record)
-    return new_record
+    try:
+        existing_patient = db.query(Patient).filter(Patient.id == record.patient_id).first()
+        if not existing_patient:
+            raise HTTPException(status_code=404, detail="Patient not found")
+        new_record = MedicalRecord(patient_id=record.patient_id, record_details=record.record_details)
+        db.add(new_record)
+        db.commit()
+        db.refresh(new_record)
+        return new_record
+    except HTTPException as e: #Handle existing exceptions
+        raise e
+    except Exception as e: #Handle other exceptions
+        print(f"Error creating record: {e}") #Log the error
+        raise HTTPException(status_code=500, detail="Internal Server Error")
 
 @app.get("/view-records/{patient_id}/", response_model=list[MedicalRecord])
 def view_records(patient_id: uuid.UUID, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
@@ -147,25 +165,37 @@ def view_records(patient_id: uuid.UUID, db: Session = Depends(get_db), current_u
 
 @app.put("/update-record/{record_id}/", response_model=MedicalRecord)
 def update_record(record_id: uuid.UUID, record_update: RecordUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    record = db.query(MedicalRecord).filter(MedicalRecord.id == record_id).first()
-    if not record:
-        raise HTTPException(status_code=404, detail="Record not found")
+    try:
+        record = db.query(MedicalRecord).filter(MedicalRecord.id == record_id).first()
+        if not record:
+            raise HTTPException(status_code=404, detail="Record not found")
 
-    if record_update.record_details:
-        record.record_details = record_update.record_details  # Update only if a new detail is provided
+        if record_update.record_details:
+            record.record_details = record_update.record_details  # Update only if a new detail is provided
 
-    db.commit()
-    db.refresh(record)
-    return record
+        db.commit()
+        db.refresh(record)
+        return record
+    except HTTPException as e:
+      raise e
+    except Exception as e:
+        print(f"Error updating record: {e}") #Log the error
+        raise HTTPException(status_code=500, detail="Internal Server Error")
 
 
 @app.delete("/delete-record/{record_id}/", status_code=status.HTTP_204_NO_CONTENT)
 def delete_record(record_id: uuid.UUID, db: Session = Depends(get_db)):
-    record = db.query(MedicalRecord).filter(MedicalRecord.id == record_id).first()
-    if not record:
-        raise HTTPException(status_code=404, detail="Record not found")
-    db.delete(record)
-    db.commit()
-    return None # 204 No Content
+    try:
+        record = db.query(MedicalRecord).filter(MedicalRecord.id == record_id).first()
+        if not record:
+            raise HTTPException(status_code=404, detail="Record not found")
+        db.delete(record)
+        db.commit()
+        return None # 204 No Content
+    except HTTPException as e:
+      raise e
+    except Exception as e:
+        print(f"Error deleting record: {e}") #Log the error
+        raise HTTPException(status_code=500, detail="Internal Server Error")
 
 
