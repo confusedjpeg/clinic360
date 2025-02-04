@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field #for input validation
 from typing import Optional
 
 
-SECRET_KEY = os.environ.get("SECRET_KEY", "your_secret_key") #Set your own SECRET_KEY in .env file or os environment variable
+SECRET_KEY = os.environ.get("SECRET_KEY", "default_key_for_development_only") #Set your own SECRET_KEY in .env file or os environment variable
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 app = FastAPI()
 
@@ -76,6 +76,8 @@ class MedicalRecord(BaseModel):
     class Config:
         orm_mode = True
 
+class RecordUpdate(BaseModel):
+    record_details: str | None = Field(default=None, min_length=1) 
 
 
 @app.post("/register-patient/", response_model=Patient)
@@ -101,6 +103,29 @@ def create_record(record: MedicalRecordCreate, db: Session = Depends(get_db)):
 def view_records(patient_id: uuid.UUID, db: Session = Depends(get_db)):
     records = db.query(MedicalRecord).filter(MedicalRecord.patient_id == patient_id).all()
     return records
+
+@app.put("/update-record/{record_id}/", response_model=MedicalRecord)
+def update_record(record_id: uuid.UUID, record_update: RecordUpdate, db: Session = Depends(get_db)):
+    record = db.query(MedicalRecord).filter(MedicalRecord.id == record_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Record not found")
+
+    if record_update.record_details:
+        record.record_details = record_update.record_details  # Update only if a new detail is provided
+
+    db.commit()
+    db.refresh(record)
+    return record
+
+
+@app.delete("/delete-record/{record_id}/", status_code=status.HTTP_204_NO_CONTENT)
+def delete_record(record_id: uuid.UUID, db: Session = Depends(get_db)):
+    record = db.query(MedicalRecord).filter(MedicalRecord.id == record_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Record not found")
+    db.delete(record)
+    db.commit()
+    return None # 204 No Content
 
 
 @app.post("/token") #Simple Token endpoint

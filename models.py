@@ -4,7 +4,7 @@ from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 from sqlalchemy.dialects.postgresql import UUID
 import os
 
-DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://user:password@localhost:5432/clinic360") # Replace with your credentials
+DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://postgres:kuhu2004@localhost:5432/clinic360") # Replace with your credentials
 
 engine = create_engine(DATABASE_URL)
 Base = declarative_base()
