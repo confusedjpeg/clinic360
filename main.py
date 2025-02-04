@@ -3,14 +3,14 @@ import uuid
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from models import User, Patient, MedicalRecord, SessionLocal
+from models import User, Patient, MedicalRecord, Appointment, Doctor, SessionLocal
 import jwt
 import os
 from datetime import datetime, timedelta
 from pydantic import BaseModel, Field #for input validation
 from typing import Optional
-import bcrypt  # Install with: pip install bcrypt
-
+import bcrypt  
+from datetime import datetime
 
 
 SECRET_KEY = os.environ.get("SECRET_KEY", "default_key_for_development_only") #Set your own SECRET_KEY in .env file or os environment variable
@@ -42,6 +42,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expired")
    except jwt.InvalidTokenError:
        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
 
 #Pydantic Models for input validation
 
@@ -87,6 +88,10 @@ class MedicalRecord(BaseModel):
 
 class RecordUpdate(BaseModel):
     record_details: str | None = Field(default=None, min_length=1) 
+
+class AppointmentCreate(BaseModel):
+    doctor_id: uuid.UUID = Field(...)
+    appointment_time: datetime = Field(...) #Requires specific format
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
@@ -198,4 +203,47 @@ def delete_record(record_id: uuid.UUID, db: Session = Depends(get_db)):
         print(f"Error deleting record: {e}") #Log the error
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
+@app.post("/book-appointment/")
+async def book_appointment(appointment_data: AppointmentCreate, db: Session = Depends(get_db), current_user:User = Depends(get_current_user)):
+    #Simple availability check (replace with more sophisticated logic later)
+    doctor = db.query(Doctor).filter(Doctor.id == appointment_data.doctor_id).first()
+    if not doctor:
+        raise HTTPException(status_code=404, detail="Doctor not found")
 
+    #Concurrency Handling (using database transaction)
+    try:
+        db.begin() #Start transaction
+        new_appointment = Appointment(doctor_id=appointment_data.doctor_id, patient_id=current_user.id, appointment_time=appointment_data.appointment_time)
+        db.add(new_appointment)
+        db.commit() #Commit transaction only if successful
+        db.refresh(new_appointment)
+    except Exception as e:
+        db.rollback() #Rollback transaction if error occurs
+        print(f"Error booking appointment: {e}") #Log the error
+        raise HTTPException(status_code=500, detail="Error booking appointment. Please try again later.")
+
+    return new_appointment
+
+@app.put("/reschedule-appointment/{appointment_id}/")
+async def reschedule_appointment(appointment_id: uuid.UUID, new_appointment_time: datetime, db: Session = Depends(get_db), current_user:User = Depends(get_current_user)):
+  appointment = db.query(Appointment).filter(Appointment.id == appointment_id, Appointment.patient_id == current_user.id, Appointment.booked == True).first()
+  if not appointment:
+    raise HTTPException(status_code=404, detail="Appointment not found or already cancelled")
+
+  #Check if the new time is valid (e.g., not in the past)
+  if new_appointment_time < datetime.now():
+    raise HTTPException(status_code=400, detail="Cannot schedule appointment in the past")
+
+  appointment.appointment_time = new_appointment_time
+  db.commit()
+  return appointment
+
+@app.delete("/cancel-appointment/{appointment_id}/")
+async def cancel_appointment(appointment_id: uuid.UUID, db: Session = Depends(get_db), current_user:User = Depends(get_current_user)):
+  appointment = db.query(Appointment).filter(Appointment.id == appointment_id, Appointment.patient_id == current_user.id, Appointment.booked == True).first()
+  if not appointment:
+    raise HTTPException(status_code=404, detail="Appointment not found or already cancelled")
+
+  appointment.booked = False #Instead of deleting, we set the booked status to False
+  db.commit()
+  return {"message": "Appointment cancelled successfully"}

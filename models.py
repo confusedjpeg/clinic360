@@ -1,5 +1,5 @@
 import uuid
-from sqlalchemy import create_engine, Column, Integer, String, Text, ForeignKey
+from sqlalchemy import create_engine, Column, Integer, String, Text, ForeignKey,DateTime,Boolean
 from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 from sqlalchemy.dialects.postgresql import UUID
 import os
@@ -39,6 +39,22 @@ class MedicalRecord(Base):
     patient_id = Column(UUID(as_uuid=True), ForeignKey("patients.id"), nullable=False)
     record_details = Column(Text, nullable=False) #Keep simple for now
 
+class Doctor(Base):
+    __tablename__ = "doctors"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String, nullable=False)
+    speciality = Column(String) #Can be null
+    # Add other doctor details as needed
+
+    appointments = relationship("Appointment", backref="doctor")
+
+class Appointment(Base):
+    __tablename__ = "appointments"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    doctor_id = Column(UUID(as_uuid=True), ForeignKey("doctors.id"), nullable=False)
+    patient_id = Column(UUID(as_uuid=True), ForeignKey("patients.id"), nullable=False)
+    appointment_time = Column(DateTime, nullable=False)
+    booked = Column(Boolean, default=True) #To allow cancellation
 
 
 Base.metadata.create_all(engine)
