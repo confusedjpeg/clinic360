@@ -56,6 +56,16 @@ class Appointment(Base):
     appointment_time = Column(DateTime, nullable=False)
     booked = Column(Boolean, default=True) #To allow cancellation
 
+class DoctorAvailability(Base):
+    __tablename__ = 'doctor_availability'
+    id = Column(Integer, primary_key=True)
+    doctor_id = Column(UUID(as_uuid=True), ForeignKey('doctors.id'), nullable=False)
+    start_time = Column(DateTime, nullable=False)
+    end_time = Column(DateTime, nullable=False)
+    booked = Column(Boolean, default=False)
+
+    doctor = relationship("Doctor", backref=backref("availability", cascade="all, delete-orphan"))
+
 
 Base.metadata.create_all(engine)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
