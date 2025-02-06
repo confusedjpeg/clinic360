@@ -26,4 +26,13 @@ function App() {
           element={
             <PrivateRoute>
               <DoctorDashboard />
-            </Pri
+            </PrivateRoute>
+          } 
+        />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    </Router>
+  );
+}
+
+export default App;

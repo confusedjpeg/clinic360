@@ -61,4 +61,9 @@ const LoginPage = () => {
       <p>
   Don't have an account? <Link to="/register">Register here</Link>.
 </p>
-      {error &
+      {error && <p style={{color:"red"}}>{error}</p>}
+    </div>
+  );
+};
+
+export default LoginPage;

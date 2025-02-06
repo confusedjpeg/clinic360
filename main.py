@@ -2,6 +2,7 @@ import uvicorn
 import uuid
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from models import User, Patient, MedicalRecord, Appointment, Doctor, SessionLocal
 import jwt
@@ -13,12 +14,20 @@ import bcrypt
 from datetime import datetime
 from celery.schedules import crontab
 from celery.result import AsyncResult
-from notif import send_email 
+from notif import send_email
 
 
 SECRET_KEY = os.environ.get("SECRET_KEY", "default_key_for_development_only") #Set your own SECRET_KEY in .env file or os environment variable
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # List your frontend's URL(s) here
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 #Database Dependency
 def get_db():
@@ -223,7 +232,7 @@ async def book_appointment(appointment_data: AppointmentCreate, db: Session = De
         email_data = {
             "recipient": current_user.email, #You'll need to add email field to your User model.
             "subject": "Appointment Confirmation",
-            "body": f"Your appointment with Dr. {doctor.name} is scheduled for {appointment.appointment_time}",
+            "body": f"Your appointment with Dr. {doctor.name} is scheduled for {new_appointment.appointment_time}",
         }
         send_email.delay(email_data)
     except Exception as e:
