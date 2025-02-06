@@ -1,6 +1,6 @@
 import uuid
 from sqlalchemy import create_engine, Column, Integer, String, Text, ForeignKey,DateTime,Boolean
-from sqlalchemy.orm import declarative_base, relationship, sessionmaker
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker, backref 
 from sqlalchemy.dialects.postgresql import UUID
 import os
 import bcrypt
