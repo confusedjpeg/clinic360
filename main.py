@@ -81,9 +81,28 @@ class PatientBase(BaseModel): #Common fields
     medical_history: Optional[str] = None
 
 class Patient(PatientBase): #Adding the UUID
-    id: uuid.UUID
+    id: Optional[uuid.UUID]
     class Config:
          orm_mode = True #this is important to use SQLAlchemy models
+
+class PatientCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=255)
+    age: int
+    gender: str
+    contact: str
+    medical_history: str
+
+class PatientOut(BaseModel):
+    id: uuid.UUID  # This field is required in output
+    name: str
+    age: Optional[int] = None
+    gender: Optional[str] = None
+    contact: Optional[str] = None
+    medical_history: Optional[str] = None
+
+    class Config:
+        orm_mode = True
+
 
 
 class MedicalRecordCreate(BaseModel):
@@ -146,17 +165,18 @@ def register_user(user: UserCredentials, db: Session = Depends(get_db)):
     return new_user
 
 
-@app.post("/register-patient/", response_model=Patient)
+@app.post("/register-patient/", response_model=PatientOut)
 def register_patient(patient: PatientCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     try:
-        new_patient = Patient(**patient.dict())
+        new_patient = Patient(**patient.dict())  # Patient here is your SQLAlchemy model
         db.add(new_patient)
         db.commit()
         db.refresh(new_patient)
-        return new_patient
+        return new_patient  # This instance should have an 'id' now
     except Exception as e:
-        print(f"Error registering patient: {e}") #Log the error
+        print(f"Error registering patient: {e}") 
         raise HTTPException(status_code=500, detail="Internal Server Error")
+
 
 @app.post("/create-record/", response_model=MedicalRecord)
 def create_record(record: MedicalRecordCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):

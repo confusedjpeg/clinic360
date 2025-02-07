@@ -6,7 +6,7 @@ import PatientRegistration from './components/patient/PatientRegistration';
 import PatientDashboard from './components/patient/PatientDashboard';
 import DoctorLogin from './components/doctor/DoctorLogin';
 import DoctorRegistration from './components/doctor/DoctorRegistration';
-import DoctorDashboard from './components/doctor/DoctorDashboard';
+import DoctorDashboard from './components/doctor/DoctorDashboard.jsx';
 import PrivateRoute from './components/PrivateRoute';
 
 function App() {

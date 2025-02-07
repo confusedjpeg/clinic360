@@ -3,6 +3,7 @@ import axios from 'axios';
 
 const PatientDetails = () => {
   const token = localStorage.getItem("accessToken");
+  console.log("Token:", token);
   const [details, setDetails] = useState({
     name: "",
     age: "",
@@ -15,12 +16,15 @@ const PatientDetails = () => {
   const handleChange = (e) => {
     setDetails({ ...details, [e.target.name]: e.target.value });
   };
-  
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       const response = await axios.post("http://localhost:8000/register-patient/", details, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       });
       setMessage("Patient details registered successfully!");
       // Optionally store patient ID: localStorage.setItem("patientId", response.data.id);
