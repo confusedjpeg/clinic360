@@ -1,35 +1,43 @@
-// src/App.js
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import LoginPage from './components/LoginPage';
-import RegistrationPage from './components/RegistrationPage'; // Import the new component
-import PatientDashboard from './components/PatientDashboard';
-import DoctorDashboard from './components/DoctorDashboard';
+import PatientLogin from './components/patient/PatientLogin';
+import PatientRegistration from './components/patient/PatientRegistration';
+import PatientDashboard from './components/patient/PatientDashboard';
+import DoctorLogin from './components/doctor/DoctorLogin';
+import DoctorRegistration from './components/doctor/DoctorRegistration';
+import DoctorDashboard from './components/doctor/DoctorDashboard';
 import PrivateRoute from './components/PrivateRoute';
 
 function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegistrationPage />} />
-        <Route 
-          path="/patient" 
+        {/* Patient Routes */}
+        <Route path="/login/patient" element={<PatientLogin />} />
+        <Route path="/register/patient" element={<PatientRegistration />} />
+        <Route
+          path="/dashboard/patient"
           element={
-            <PrivateRoute>
+            <PrivateRoute role="patient">
               <PatientDashboard />
             </PrivateRoute>
-          } 
+          }
         />
-        <Route 
-          path="/doctor" 
+
+        {/* Doctor Routes */}
+        <Route path="/login/doctor" element={<DoctorLogin />} />
+        <Route path="/register/doctor" element={<DoctorRegistration />} />
+        <Route
+          path="/dashboard/doctor"
           element={
-            <PrivateRoute>
+            <PrivateRoute role="doctor">
               <DoctorDashboard />
             </PrivateRoute>
-          } 
+          }
         />
-        <Route path="*" element={<Navigate to="/login" replace />} />
+
+        {/* Default redirect */}
+        <Route path="/" element={<Navigate to="/login/patient" replace />} />
       </Routes>
     </Router>
   );
