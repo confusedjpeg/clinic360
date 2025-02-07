@@ -296,6 +296,35 @@ async def send_test_email():
     task = send_email.delay(email_data)
     return {"task_id": task.id}
 
+class AvailabilityCreate(BaseModel):
+    start_time: datetime
+    end_time: datetime
+
+# New endpoint for adding availability
+@app.post("/add-availability/")
+def add_availability(slot: AvailabilityCreate, db: Session = Depends(get_db), current_user: dict = Depends(get_current_user)):
+    # Extract the current user ID from the JWT payload.
+    # (Assuming your token payload includes "user_id")
+    doctor_id = current_user.get("user_id")
+    if not doctor_id:
+        raise HTTPException(status_code=403, detail="Authentication error: Doctor ID not found in token.")
+
+    # Look up the doctor in the database using the provided user_id.
+    doctor = db.query(Doctor).filter(Doctor.id == uuid.UUID(doctor_id)).first()
+    if not doctor:
+        raise HTTPException(status_code=403, detail="User is not registered as a doctor.")
+
+    # Create a new availability slot using the doctor's ID and the provided times.
+    new_slot = DoctorAvailability(
+        doctor_id=doctor.id,
+        start_time=slot.start_time,
+        end_time=slot.end_time,
+        booked=False
+    )
+    db.add(new_slot)
+    db.commit()
+    db.refresh(new_slot)
+    return new_slot
 
 
 @app.get("/tasks/{task_id}/")
