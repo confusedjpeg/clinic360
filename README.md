@@ -1,5 +1,3 @@
-Below is the complete Markdown version with all formatting so that you can copy and paste it directly into your README.md file:
-
 ```markdown
 # Arogo AI – Python Developer Intern Assignment: Clinic360 Platform
 
