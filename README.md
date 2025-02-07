@@ -1,7 +1,7 @@
 ```markdown
 # Arogo AI – Python Developer Intern Assignment: Clinic360 Platform
 
-[![Video Demo](https://img.youtube.com/vi/VIDEO_ID/0.jpg)](https://youtu.be/tVD2goWGLb8)
+[![Video Demo](https://img.youtube.com/vi/tVD2goWGLb8/0.jpg)](https://www.youtube.com/watch?v=tVD2goWGLb8)
 
 ## Overview
 The Clinic360 platform is a scalable and efficient web application designed to manage electronic health records (EHR), appointment scheduling, and user interactions for both patients and doctors. This project evaluates backend development, API creation, database management, asynchronous processing, UI development, and deployment skills using Python, FastAPI, and React.
