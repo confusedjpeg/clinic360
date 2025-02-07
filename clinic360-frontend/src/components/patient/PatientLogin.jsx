@@ -14,14 +14,11 @@ const PatientLogin = () => {
       const formData = new URLSearchParams();
       formData.append("username", username);
       formData.append("password", password);
-      
       const response = await axios.post("http://localhost:8000/token", formData, {
         headers: { "Content-Type": "application/x-www-form-urlencoded" }
       });
-      
       localStorage.setItem("accessToken", response.data.access_token);
       localStorage.setItem("role", "patient");
-      // Optionally, store patientId if provided by the backend
       navigate("/dashboard/patient");
     } catch (err) {
       setError("Login failed. Please check your credentials.");

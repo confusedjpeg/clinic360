@@ -17,7 +17,7 @@ const PatientRegistration = () => {
     }
     try {
       const userData = { username, password };
-      const response = await axios.post("http://localhost:8000/register/", userData, {
+      await axios.post("http://localhost:8000/register/", userData, {
         headers: { "Content-Type": "application/json" }
       });
       alert("Registration successful! Please login.");

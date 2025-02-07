@@ -14,11 +14,9 @@ const DoctorLogin = () => {
       const formData = new URLSearchParams();
       formData.append("username", username);
       formData.append("password", password);
-      
       const response = await axios.post("http://localhost:8000/token", formData, {
         headers: { "Content-Type": "application/x-www-form-urlencoded" }
       });
-      
       localStorage.setItem("accessToken", response.data.access_token);
       localStorage.setItem("role", "doctor");
       navigate("/dashboard/doctor");
